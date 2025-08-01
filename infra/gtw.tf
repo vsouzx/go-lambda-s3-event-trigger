@@ -48,17 +48,29 @@ resource "aws_api_gateway_resource" "excel_gw_api_resource" {
     rest_api_id     = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
 }
 
+# Novo recurso filho para capturar o {object}
+resource "aws_api_gateway_resource" "excel_gw_api_resource_object" {
+  parent_id   = aws_api_gateway_resource.excel_gw_api_resource.id
+  path_part   = "{object}"
+  rest_api_id = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+}
+
 //POST /transaction
 resource "aws_api_gateway_method" "excel_gw_api_method_post" {
     authorization   = "NONE"
     http_method     = "POST"
-    resource_id     = aws_api_gateway_resource.excel_gw_api_resource.id
+    resource_id     = aws_api_gateway_resource.excel_gw_api_resource_object.id
     rest_api_id     = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+
+      # Habilitar parâmetro de path
+  request_parameters = {
+    "method.request.path.object" = true
+  }
 }
 
 resource "aws_api_gateway_integration" "excel_s3_integration_post" {
   rest_api_id             = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
-  resource_id             = aws_api_gateway_resource.excel_gw_api_resource.id
+  resource_id             = aws_api_gateway_resource.excel_gw_api_resource_object.id
   http_method             = aws_api_gateway_method.excel_gw_api_method_post.http_method
   type                    = "AWS"
   integration_http_method = "PUT" # Método usado para envio de arquivo
