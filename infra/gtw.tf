@@ -55,10 +55,10 @@ resource "aws_api_gateway_resource" "excel_gw_api_resource_object" {
   rest_api_id = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
 }
 
-//POST /transaction
+//GET
 resource "aws_api_gateway_method" "excel_gw_api_method_post" {
   authorization   = "NONE"
-  http_method     = "POST"
+  http_method     = "GET"
   resource_id     = aws_api_gateway_resource.excel_gw_api_resource_object.id
   rest_api_id     = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
 
