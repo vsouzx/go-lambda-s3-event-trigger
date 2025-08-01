@@ -4,8 +4,7 @@ resource "aws_api_gateway_rest_api" "bucket_s3_gtw_api" {
 
 
     binary_media_types = [
-      "application/octet-stream",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      "*"
     ]
 
     endpoint_configuration {
