@@ -9,7 +9,7 @@ resource "aws_s3_bucket" "excel_bucket" {
 }
 
 resource "aws_s3_bucket_public_access_block" "fotos_colaboradores_block" {
-  bucket = aws_s3_bucket.s_facial_recognition_bucket.id
+  bucket = aws_s3_bucket.excel_bucket.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -19,7 +19,7 @@ resource "aws_s3_bucket_public_access_block" "fotos_colaboradores_block" {
 resource "aws_lambda_permission" "allow_s3_to_invoke_lambda" {
   statement_id  = "AllowS3InvokeLambda"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.process_excel.function_name
+  function_name = aws_lambda_function.lambda.function_name
   principal     = "s3.amazonaws.com"
   source_arn    = aws_s3_bucket.excel_bucket.arn
 }
