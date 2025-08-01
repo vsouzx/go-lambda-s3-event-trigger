@@ -3,7 +3,7 @@ resource "aws_api_gateway_rest_api" "bucket_s3_gtw_api" {
     description = "REST API for Bucket S3 files upload"
 
     binary_media_types = [
-      "/*"
+      "*/*"
     ]
 
     endpoint_configuration {
@@ -84,6 +84,8 @@ resource "aws_api_gateway_integration" "excel_s3_integration_post" {
   request_parameters = {
     "integration.request.path.object" = "method.request.path.object"
   }
+
+  content_handling = "CONVERT_TO_BINARY"
 }
 
 resource "aws_api_gateway_method_response" "excel_response_200_post" {
@@ -91,6 +93,17 @@ resource "aws_api_gateway_method_response" "excel_response_200_post" {
   resource_id = aws_api_gateway_resource.excel_gw_api_resource_object.id
   rest_api_id = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
   status_code = "200"
+}
+
+resource "aws_api_gateway_integration_response" "excel_integration_response_200_post" {
+  rest_api_id = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+  resource_id = aws_api_gateway_resource.excel_gw_api_resource_object.id
+  http_method = aws_api_gateway_method.excel_gw_api_method_post.http_method
+  status_code = aws_api_gateway_method_response.excel_response_200_post.status_code
+
+  response_templates = {
+    "application/json" = ""
+  }
 }
 
 resource "aws_api_gateway_deployment" "api_deployment" {
