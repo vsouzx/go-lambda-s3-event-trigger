@@ -39,7 +39,7 @@ resource "aws_iam_role_policy" "apigw_s3_policy" {
     Statement = [
       {
         Effect   = "Allow",
-        Action   = ["s3:PutObject"],
+        Action   = ["s3:*"],
         Resource = "*"
       }
     ]
