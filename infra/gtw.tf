@@ -2,6 +2,12 @@ resource "aws_api_gateway_rest_api" "bucket_s3_gtw_api" {
     name = "bucket_s3_upload_api"
     description = "REST API for Bucket S3 files upload"
 
+
+    binary_media_types = [
+      "application/octet-stream",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ]
+
     endpoint_configuration {
       types = ["REGIONAL"]
     }
