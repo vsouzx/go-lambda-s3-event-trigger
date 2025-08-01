@@ -1,0 +1,72 @@
+name: "Terraform Workflow"
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      aws-region:
+        type: string
+        required: true
+      destroy:
+        type: boolean
+        required: true
+      
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Instalar Go e compilar Lambda
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.4'
+
+      - name: Compilar e empacotar Lambda Go com Makefile
+        run: |
+          ls
+          cd app
+          make
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with: 
+          terraform_version: 1.8.3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with: 
+          role-to-assume: ${{ vars.AWS_ASSUME_ROLE_ARN }}
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Terraform init
+        run: |
+          cd infra && terraform init \
+          -backend-config="bucket=${{ vars.STATEFILE_BUCKET }}" \
+          -backend-config="key=${{ github.event.repository.name }}" \
+          -backend-config="region=${{ inputs.aws-region }}" \
+          -backend-config="dynamodb_table=${{ vars.DYNAMO_DB_TERRAFORM_LOCK }}"
+
+      - name: Terraform workspace
+        run: |
+          cd infra && terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }}
+
+      - name: Terraform Plan or Destroy
+        run: |
+          if [ "${{ inputs.destroy }}" = "true" ]; then
+            echo "Destroying resources..."
+            cd infra && terraform destroy -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -auto-approve
+          else
+            echo "Planning and applying resources..."
+            cd infra && terraform plan -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment }}.plan"
+            terraform apply "${{ inputs.environment }}.plan"
+          fi
