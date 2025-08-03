@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/vsouzx/go-lambda-s3-event-trigger/configs"
+	"github.com/vsouzx/go-lambda-s3-event-trigger/repository"
 	"github.com/vsouzx/go-lambda-s3-event-trigger/service"
 )
 
@@ -18,8 +19,10 @@ func main() {
 func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 	start := time.Now()
 
+	repository := repository.NewRepository(configs.NewDynamoClient())
 	s3Service := service.NewS3Service(configs.NewS3Client())
-	excelService := service.NewExcelService(configs.NewDynamoClient())
+	excelToCsvService := service.NewExcelToCsvService()
+	csvProcessorService := service.NewCsvProcessorService(repository)
 
 	for _, record := range s3Event.Records {
 		bucketName := record.S3.Bucket.Name
@@ -31,16 +34,16 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 			return err
 		}
 
-		if err := excelService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv"); err != nil {
+		if err := excelToCsvService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv"); err != nil {
 			return fmt.Errorf("erro ao converter excel para csv: %w", err)
 		}
 
-		if err := excelService.ProcessCSVFile("/tmp/output.csv"); err != nil {
+		if err := csvProcessorService.ProcessCSVFile("/tmp/output.csv"); err != nil {
 			return fmt.Errorf("erro ao processar registros do excel no dynamo: %w", err)
 		}
 	}
 
 	duration := time.Since(start)
-	fmt.Printf("✅ Lambda concluída em %v\n", duration)
+	fmt.Printf("Lambda concluída em %v\n", duration)
 	return nil
 }
