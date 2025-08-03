@@ -10,4 +10,4 @@
 
 
 ### Benchmarks
-- Arquivo excel com 1 milhão de registros sendo processado em 2 minutos.
+- Arquivo excel com 1 milhão de registros sendo processado em 1m40s.

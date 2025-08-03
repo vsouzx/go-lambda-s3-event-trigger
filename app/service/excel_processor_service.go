@@ -98,6 +98,6 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 	close(batchChan)
 	wg.Wait()
 
-	fmt.Printf("Finalizado processamento do CSV com %d linhas\n", line)
+	fmt.Printf("Finalizado processamento do Excel com %d linhas\n", line)
 	return nil
 }
