@@ -8,12 +8,18 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xuri/excelize/v2"
+)
+
+const (
+	batchSize   = 25 // limite do DynamoDB
+	workerCount = 10 // número de goroutines para processar em paralelo
 )
 
 type ExcelService struct {
@@ -68,12 +74,30 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 	reader := csv.NewReader(file)
 	reader.FieldsPerRecord = -1
 
+	// Canal para enviar lotes para workers
+	batchChan := make(chan []map[string]string, 100)
+	var wg sync.WaitGroup
+
+	// 🚀 Workers que vão processar os lotes
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for batch := range batchChan {
+				if err := es.flushBatch(context.Background(), tableName, batch); err != nil {
+					fmt.Printf("❌ [Worker %d] Erro ao inserir lote: %v\n", id, err)
+				}
+			}
+		}(i)
+	}
+
+	// Leitura do CSV e envio para o canal
 	line := 0
 	var batch []map[string]string
 
-	// Leitura do CSV
 	for {
 		record, err := reader.Read()
+		fmt.Println("Processando linha:", line)
 		if err == io.EOF {
 			fmt.Println("Fim do arquivo CSV")
 			break
@@ -96,63 +120,73 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 			"departamento":         record[2],
 		})
 
-		// Quando atingir 25, envia
-		if len(batch) == 25 {
-			if err := es.flushBatch(context.Background(), tableName, batch, line); err != nil {
-				return err
-			}
+		// Envia lote quando atingir 25 itens
+		if len(batch) == batchSize {
+			b := make([]map[string]string, len(batch))
+			copy(b, batch)
+			batchChan <- b
 			batch = batch[:0]
 		}
 	}
 
-	return es.flushBatch(context.Background(), tableName, batch, line)
+	// Envia último lote
+	if len(batch) > 0 {
+		batchChan <- batch
+	}
+
+	close(batchChan)
+	wg.Wait()
+
+	fmt.Printf("✅ Finalizado processamento do CSV com %d linhas\n", line)
+	return nil
 }
 
-func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch []map[string]string, line int) error {
-    if len(batch) == 0 {
-        return nil
-    }
+func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch []map[string]string) error {
+	if len(batch) == 0 {
+		return nil
+	}
 
-    // Monta WriteRequests
-    writeReq := make([]types.WriteRequest, 0, len(batch))
-    for _, item := range batch {
-        av, err := attributevalue.MarshalMap(item)
-        if err != nil {
-            return fmt.Errorf("erro ao converter item: %w", err)
-        }
-        writeReq = append(writeReq, types.WriteRequest{
-            PutRequest: &types.PutRequest{Item: av},
-        })
-    }
+	// Monta WriteRequests
+	writeReq := make([]types.WriteRequest, 0, len(batch))
+	for _, item := range batch {
+		av, err := attributevalue.MarshalMap(item)
+		if err != nil {
+			return fmt.Errorf("erro ao converter item: %w", err)
+		}
+		writeReq = append(writeReq, types.WriteRequest{
+			PutRequest: &types.PutRequest{Item: av},
+		})
+	}
 
-    // Payload inicial
-    request := map[string][]types.WriteRequest{
-        tableName: writeReq,
-    }
+	request := map[string][]types.WriteRequest{
+		tableName: writeReq,
+	}
 
-    // 🔥 Loop até esvaziar UnprocessedItems
-    retries := 0
-    for len(request) > 0 && retries < 20 { // 20 tentativas antes de desistir
-        resp, err := es.dynamoClient.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
-            RequestItems: request,
-        })
-        if err != nil {
-            return fmt.Errorf("erro no BatchWriteItem: %w", err)
-        }
+	retries := 0
+	for len(request) > 0 && retries < 25 {
+		resp, err := es.dynamoClient.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+			RequestItems: request,
+		})
+		if err != nil {
+			return fmt.Errorf("erro no BatchWriteItem: %w", err)
+		}
 
-        if len(resp.UnprocessedItems) == 0 {
-            fmt.Printf("✅ Lote de %d itens inserido com sucesso! Total: %d\n", len(batch), line)
-            return nil
-        }
+		if len(resp.UnprocessedItems) == 0 {
+			fmt.Printf("✅ Lote de %d itens inserido com sucesso!\n", len(batch))
+			return nil
+		}
 
-        fmt.Printf("⚠️ %d itens não processados, retry %d...\n",
-            len(resp.UnprocessedItems[tableName]), retries+1)
+		// Se ainda restam itens não processados, reenvia apenas eles
+		request = resp.UnprocessedItems
+		retries++
+		fmt.Printf("⚠️ Retry %d - Restam %d itens não processados\n", retries, len(request[tableName]))
 
-        request = resp.UnprocessedItems
-        retries++
+		// Backoff exponencial
+		time.Sleep(time.Duration((1<<retries)*100+rand.Intn(300)) * time.Millisecond)
+	}
 
-        time.Sleep(time.Duration((1<<retries)*100+rand.Intn(200)) * time.Millisecond)
-    }
-
-	return fmt.Errorf("❌ alguns itens não foram processados após %d tentativas", retries)
+	if len(request) > 0 {
+		return fmt.Errorf("❌ %d itens não processados após %d tentativas", len(request[tableName]), retries)
+	}
+	return nil
 }
