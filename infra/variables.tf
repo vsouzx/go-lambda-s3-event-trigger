@@ -19,11 +19,11 @@ variable "bucket_name" {
 }
 
 variable "workers" {
-  type = integer
+  type = number
   default = 10
 }
 
 variable "batch_size" {
-  type = integer
+  type = number
   default = 25
 }
