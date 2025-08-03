@@ -10,4 +10,4 @@
 
 
 ### Benchmarks
-- Arquivo excel 100k registros sendo processado em 20s.
+- Arquivo excel 250k registros sendo processado em 31s.
