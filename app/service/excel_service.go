@@ -6,7 +6,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -86,19 +88,38 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 			})
 		}
 
-		// Enviar para DynamoDB
-		_, err := es.dynamoClient.BatchWriteItem(context.Background(), &dynamodb.BatchWriteItemInput{
-			RequestItems: map[string][]types.WriteRequest{
-				tableName: writeReq,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("erro no BatchWriteItem: %w", err)
+		// Estrutura do payload inicial
+		request := map[string][]types.WriteRequest{
+			tableName: writeReq,
 		}
 
-		fmt.Printf("✅ Inserido lote de %d itens\n", len(batch))
-		batch = batch[:0] // limpa
-		return nil
+		maxRetries := 5
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			resp, err := es.dynamoClient.BatchWriteItem(context.Background(), &dynamodb.BatchWriteItemInput{
+				RequestItems: request,
+			})
+			if err != nil {
+				return fmt.Errorf("erro no BatchWriteItem: %w", err)
+			}
+
+			// Se não há itens não processados, terminou com sucesso
+			if len(resp.UnprocessedItems) == 0 {
+				fmt.Printf("✅ Inserido lote de %d itens\n. Total: %d", len(batch), line)
+				batch = batch[:0]
+				return nil
+			}
+
+			// Caso contrário, tenta novamente apenas os itens não processados
+			fmt.Printf("⚠️ %d itens não processados, retry %d/%d...\n",
+				len(resp.UnprocessedItems[tableName]), attempt, maxRetries)
+
+			request = resp.UnprocessedItems
+
+			// Backoff exponencial com jitter
+			time.Sleep(time.Duration((1<<attempt)*100+rand.Intn(100)) * time.Millisecond)
+		}
+
+		return fmt.Errorf("❌ falha ao inserir lote após %d tentativas", maxRetries)
 	}
 
 	// Leitura do CSV
