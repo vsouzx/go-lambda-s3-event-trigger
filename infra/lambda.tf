@@ -48,6 +48,12 @@ resource "aws_lambda_function" "lambda" {
   filename         = "lambda.zip"
   source_code_hash = filebase64sha256("${path.module}/lambda.zip")
   memory_size      = 256
+
+  environment {
+    variables = {
+      DYNAMO_TABLE = var.dynamo_table
+    }
+  }
 }
 
 resource "aws_cloudwatch_log_group" "example"{
