@@ -71,59 +71,6 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 	line := 0
 	var batch []map[string]string
 
-	flushBatch := func() error {
-		if len(batch) == 0 {
-			fmt.Println("Nenhum item para inserir")
-			return nil
-		}
-
-		// Montar requests
-		writeReq := make([]types.WriteRequest, 0, len(batch))
-		for _, item := range batch {
-			av, err := attributevalue.MarshalMap(item)
-			if err != nil {
-				return fmt.Errorf("erro ao converter item: %w", err)
-			}
-			writeReq = append(writeReq, types.WriteRequest{
-				PutRequest: &types.PutRequest{Item: av},
-			})
-		}
-
-		// Estrutura do payload inicial
-		request := map[string][]types.WriteRequest{
-			tableName: writeReq,
-		}
-
-		maxRetries := 5
-		for attempt := 1; attempt <= maxRetries; attempt++ {
-			resp, err := es.dynamoClient.BatchWriteItem(context.Background(), &dynamodb.BatchWriteItemInput{
-				RequestItems: request,
-			})
-			fmt.Printf("Enviando lote de %d itens. Total: %d\n", len(batch), line)
-			if err != nil {
-				return fmt.Errorf("erro no BatchWriteItem: %w", err)
-			}
-
-			// Se não há itens não processados, terminou com sucesso
-			if len(resp.UnprocessedItems) == 0 {
-				fmt.Printf("✅ Inserido lote de %d itens. Total: %d\n", len(batch), line)
-				batch = batch[:0]
-				return nil
-			}
-
-			// Caso contrário, tenta novamente apenas os itens não processados
-			fmt.Printf("⚠️ %d itens não processados, retry %d/%d...\n",
-				len(resp.UnprocessedItems[tableName]), attempt, maxRetries)
-
-			request = resp.UnprocessedItems
-
-			// Backoff exponencial com jitter
-			time.Sleep(time.Duration((1<<attempt)*100+rand.Intn(100)) * time.Millisecond)
-		}
-
-		return fmt.Errorf("❌ falha ao inserir lote após %d tentativas", maxRetries)
-	}
-
 	// Leitura do CSV
 	for {
 		record, err := reader.Read()
@@ -151,12 +98,65 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 		// Quando atingir 25, envia
 		if len(batch) == 25 {
-			if err := flushBatch(); err != nil {
+			if err := es.flushBatch(context.Background(), tableName, batch); err != nil {
 				return err
 			}
+			batch = batch[:0]
 		}
 	}
 
-	// Envia o restante
-	return flushBatch()
+	return es.flushBatch(context.Background(), tableName, batch)
+}
+
+func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch []map[string]string) error {
+    if len(batch) == 0 {
+        return nil
+    }
+
+    // Monta WriteRequests
+    writeReq := make([]types.WriteRequest, 0, len(batch))
+    for _, item := range batch {
+        av, err := attributevalue.MarshalMap(item)
+        if err != nil {
+            return fmt.Errorf("erro ao converter item: %w", err)
+        }
+        writeReq = append(writeReq, types.WriteRequest{
+            PutRequest: &types.PutRequest{Item: av},
+        })
+    }
+
+    // Payload inicial
+    request := map[string][]types.WriteRequest{
+        tableName: writeReq,
+    }
+
+    // 🔥 Loop até esvaziar UnprocessedItems
+    retries := 0
+    for len(request) > 0 && retries < 20 { // 20 tentativas antes de desistir
+        resp, err := es.dynamoClient.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+            RequestItems: request,
+        })
+        if err != nil {
+            return fmt.Errorf("erro no BatchWriteItem: %w", err)
+        }
+
+        if len(resp.UnprocessedItems) == 0 {
+            fmt.Printf("✅ Lote de %d itens inserido com sucesso!\n", len(batch))
+            break
+        }
+
+        fmt.Printf("⚠️ %d itens não processados, retry %d...\n",
+            len(resp.UnprocessedItems[tableName]), retries+1)
+
+        request = resp.UnprocessedItems
+        retries++
+
+        time.Sleep(time.Duration((1<<retries)*100+rand.Intn(200)) * time.Millisecond)
+    }
+
+    if len(request) > 0 {
+        return fmt.Errorf("❌ alguns itens não foram processados após %d tentativas", retries)
+    }
+
+    return nil
 }
