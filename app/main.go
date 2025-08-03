@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -15,6 +16,8 @@ func main() {
 }
 
 func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
+	start := time.Now()
+
 	s3Service := service.NewS3Service(configs.NewS3Client())
 	excelService := service.NewExcelService(configs.NewDynamoClient())
 
@@ -27,7 +30,7 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if err := excelService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv"); err != nil {
 			return fmt.Errorf("erro ao converter excel para csv: %w", err)
 		}
@@ -36,5 +39,8 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 			return fmt.Errorf("erro ao processar registros do excel no dynamo: %w", err)
 		}
 	}
+
+	duration := time.Since(start)
+	fmt.Printf("✅ Lambda concluída em %v\n", duration)
 	return nil
 }
