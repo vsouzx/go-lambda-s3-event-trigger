@@ -19,7 +19,7 @@ import (
 
 const (
 	batchSize   = 25 // limite do DynamoDB
-	workerCount = 15 // número de goroutines para processar em paralelo
+	workerCount = 8 // número de goroutines para processar em paralelo
 )
 
 type ExcelService struct {
