@@ -17,3 +17,13 @@ variable "dynamo_table" {
 variable "bucket_name" {
   type = string
 }
+
+variable "workers" {
+  type = integer
+  default = 10
+}
+
+variable "batch_size" {
+  type = integer
+  default = 25
+}

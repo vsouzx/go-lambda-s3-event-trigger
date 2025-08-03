@@ -6,14 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/vsouzx/go-lambda-s3-event-trigger/repository"
-)
-
-const (
-	batchSize   = 25 // limite do DynamoDB
-	workerCount = 10 // número de goroutines para processar em paralelo
 )
 
 type CsvProcessorService struct {
@@ -27,7 +23,9 @@ func NewCsvProcessorService(repository *repository.Repository) *CsvProcessorServ
 }
 
 func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
-	tableName := "excel-import"
+	tableName := os.Getenv("DYNAMODB_TABLE_NAME")
+	workerCount, _ := strconv.Atoi(os.Getenv("WORKER_COUNT"))
+	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 
 	file, err := os.Open(csvPath)
 	if err != nil {

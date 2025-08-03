@@ -68,6 +68,8 @@ resource "aws_lambda_function" "lambda" {
   environment {
     variables = {
       DYNAMO_TABLE = var.dynamo_table
+      WORKERS = var.workers
+      BATCH_SIZE = var.batch_size
     }
   }
 }
