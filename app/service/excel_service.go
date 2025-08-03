@@ -98,17 +98,17 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 		// Quando atingir 25, envia
 		if len(batch) == 25 {
-			if err := es.flushBatch(context.Background(), tableName, batch); err != nil {
+			if err := es.flushBatch(context.Background(), tableName, batch, line); err != nil {
 				return err
 			}
 			batch = batch[:0]
 		}
 	}
 
-	return es.flushBatch(context.Background(), tableName, batch)
+	return es.flushBatch(context.Background(), tableName, batch, line)
 }
 
-func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch []map[string]string) error {
+func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch []map[string]string, line int) error {
     if len(batch) == 0 {
         return nil
     }
@@ -141,7 +141,7 @@ func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch 
         }
 
         if len(resp.UnprocessedItems) == 0 {
-            fmt.Printf("✅ Lote de %d itens inserido com sucesso!\n", len(batch))
+            fmt.Printf("✅ Lote de %d itens inserido com sucesso! Total: %d\n", len(batch), line)
             return nil
         }
 
