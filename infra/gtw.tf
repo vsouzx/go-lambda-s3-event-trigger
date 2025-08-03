@@ -89,9 +89,9 @@ resource "aws_api_gateway_integration" "excel_s3_integration_post" {
 }
 
 resource "aws_api_gateway_method_response" "excel_response_200_post" {
-  http_method = aws_api_gateway_method.excel_gw_api_method_post.http_method
-  resource_id = aws_api_gateway_resource.excel_gw_api_resource_object.id
   rest_api_id = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+  resource_id = aws_api_gateway_resource.excel_gw_api_resource_object.id
+  http_method = aws_api_gateway_method.excel_gw_api_method_post.http_method
   status_code = "200"
 }
 
@@ -104,6 +104,10 @@ resource "aws_api_gateway_integration_response" "excel_integration_response_200_
   response_templates = {
     "application/json" = ""
   }
+
+  depends_on = [
+    aws_api_gateway_integration.excel_s3_integration_post
+  ]
 }
 
 resource "aws_api_gateway_deployment" "api_deployment" {
@@ -118,7 +122,8 @@ resource "aws_api_gateway_deployment" "api_deployment" {
     }
 
     depends_on = [ 
-         aws_api_gateway_integration.excel_s3_integration_post,
+        aws_api_gateway_integration.excel_s3_integration_post,
+        aws_api_gateway_integration_response.excel_integration_response_200_post  
      ]
 }
 
