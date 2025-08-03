@@ -142,7 +142,7 @@ func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch 
 
         if len(resp.UnprocessedItems) == 0 {
             fmt.Printf("✅ Lote de %d itens inserido com sucesso!\n", len(batch))
-            break
+            return nil
         }
 
         fmt.Printf("⚠️ %d itens não processados, retry %d...\n",
@@ -154,9 +154,5 @@ func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch 
         time.Sleep(time.Duration((1<<retries)*100+rand.Intn(200)) * time.Millisecond)
     }
 
-    if len(request) > 0 {
-        return fmt.Errorf("❌ alguns itens não foram processados após %d tentativas", retries)
-    }
-
-    return nil
+	return fmt.Errorf("❌ alguns itens não foram processados após %d tentativas", retries)
 }
