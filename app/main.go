@@ -27,13 +27,14 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 		if err != nil {
 			return err
 		}
-
-		excelService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv")
-		if err != nil {
+		
+		if err := excelService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv"); err != nil {
 			return fmt.Errorf("erro ao converter excel para csv: %w", err)
 		}
 
-		excelService.ProcessCSVFile("/tmp/output.csv")
+		if err := excelService.ProcessCSVFile("/tmp/output.csv"); err != nil {
+			return fmt.Errorf("erro ao processar registros do excel no dynamo: %w", err)
+		}
 	}
 	return nil
 }
