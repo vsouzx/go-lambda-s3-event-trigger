@@ -84,7 +84,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 		go func(id int) {
 			defer wg.Done()
 			for batch := range batchChan {
-				if err := es.flushBatch(context.Background(), tableName, batch); err != nil {
+				if err := es.flushBatch(context.Background(), tableName, batch, id); err != nil {
 					fmt.Printf("❌ [Worker %d] Erro ao inserir lote: %v\n", id, err)
 				}
 			}
@@ -141,7 +141,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 	return nil
 }
 
-func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch []map[string]string) error {
+func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch []map[string]string, workerId int) error {
 	if len(batch) == 0 {
 		return nil
 	}
@@ -172,21 +172,21 @@ func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch 
 		}
 
 		if len(resp.UnprocessedItems) == 0 {
-			fmt.Printf("✅ Lote de %d itens inserido com sucesso!\n", len(batch))
+			fmt.Printf("[Worker %d] ✅ Lote de %d itens inserido com sucesso!\n", workerId, len(batch))
 			return nil
 		}
 
 		// Se ainda restam itens não processados, reenvia apenas eles
 		request = resp.UnprocessedItems
 		retries++
-		fmt.Printf("⚠️ Retry %d - Restam %d itens não processados\n", retries, len(request[tableName]))
+		fmt.Printf("[Worker %d] ⚠️ Retry %d - Restam %d itens não processados\n", workerId, retries, len(request[tableName]))
 
 		// Backoff exponencial
 		time.Sleep(time.Duration((1<<retries)*100+rand.Intn(300)) * time.Millisecond)
 	}
 
 	if len(request) > 0 {
-		return fmt.Errorf("❌ %d itens não processados após %d tentativas", len(request[tableName]), retries)
+		return fmt.Errorf("[Worker %d] ❌ %d itens não processados após %d tentativas", workerId, len(request[tableName]), retries)
 	}
 	return nil
 }
