@@ -23,7 +23,7 @@ func NewCsvProcessorService(repository *repository.Repository) *CsvProcessorServ
 }
 
 func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
-	tableName := os.Getenv("DYNAMODB_TABLE_NAME")
+	tableName := os.Getenv("DYNAMO_TABLE")
 	workerCount, _ := strconv.Atoi(os.Getenv("WORKERS"))
 	fmt.Println("workerCount:", workerCount)
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
