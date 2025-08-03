@@ -32,7 +32,8 @@ resource "aws_iam_policy" "lambda_logging" {
             },
             {
                 "Action": [
-                    "dynamodb:PutItem"
+                    "dynamodb:PutItem",
+                    "dynamodb:BatchWriteItem"
                 ],
                 "Resource": "*",
                 "Effect": "Allow"
