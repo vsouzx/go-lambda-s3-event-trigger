@@ -78,14 +78,14 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 	batchChan := make(chan []map[string]string, 100)
 	var wg sync.WaitGroup
 
-	// 🚀 Workers que vão processar os lotes
+	// Workers que vão processar os lotes
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			for batch := range batchChan {
 				if err := es.flushBatch(context.Background(), tableName, batch, id); err != nil {
-					fmt.Printf("❌ [Worker %d] Erro ao inserir lote: %v\n", id, err)
+					fmt.Printf("[Worker %d] Erro ao inserir lote: %v\n", id, err)
 				}
 			}
 		}(i)
@@ -108,7 +108,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 		line++
 		if line == 1 {
-			continue // cabeçalho
+			continue
 		}
 		if len(record) < 3 {
 			continue
@@ -120,7 +120,6 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 			"departamento":         record[2],
 		})
 
-		// Envia lote quando atingir 25 itens
 		if len(batch) == batchSize {
 			b := make([]map[string]string, len(batch))
 			copy(b, batch)
@@ -129,7 +128,6 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 		}
 	}
 
-	// Envia último lote
 	if len(batch) > 0 {
 		batchChan <- batch
 	}
@@ -137,7 +135,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 	close(batchChan)
 	wg.Wait()
 
-	fmt.Printf("✅ Finalizado processamento do CSV com %d linhas\n", line)
+	fmt.Printf("Finalizado processamento do CSV com %d linhas\n", line)
 	return nil
 }
 
@@ -146,7 +144,6 @@ func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch 
 		return nil
 	}
 
-	// Monta WriteRequests
 	writeReq := make([]types.WriteRequest, 0, len(batch))
 	for _, item := range batch {
 		av, err := attributevalue.MarshalMap(item)
@@ -172,21 +169,21 @@ func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch 
 		}
 
 		if len(resp.UnprocessedItems) == 0 {
-			fmt.Printf("[Worker %d] ✅ Lote de %d itens inserido com sucesso!\n", workerId, len(batch))
+			fmt.Printf("[Worker %d] Lote de %d itens inserido com sucesso!\n", workerId, len(batch))
 			return nil
 		}
 
 		// Se ainda restam itens não processados, reenvia apenas eles
 		request = resp.UnprocessedItems
 		retries++
-		fmt.Printf("[Worker %d] ⚠️ Retry %d - Restam %d itens não processados\n", workerId, retries, len(request[tableName]))
+		fmt.Printf("[Worker %d] Retry %d - Restam %d itens não processados\n", workerId, retries, len(request[tableName]))
 
 		// Backoff exponencial
 		time.Sleep(time.Duration((1<<retries)*100+rand.Intn(300)) * time.Millisecond)
 	}
 
 	if len(request) > 0 {
-		return fmt.Errorf("[Worker %d] ❌ %d itens não processados após %d tentativas", workerId, len(request[tableName]), retries)
+		return fmt.Errorf("[Worker %d] %d itens não processados após %d tentativas", workerId, len(request[tableName]), retries)
 	}
 	return nil
 }
