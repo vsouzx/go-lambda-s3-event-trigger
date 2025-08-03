@@ -1,41 +1,45 @@
 package service
 
 import (
+	"bytes"
 	"context"
-	"encoding/csv"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"sync"
 
-	"github.com/vsouzx/go-lambda-s3-event-trigger/repository"
 	"github.com/vsouzx/go-lambda-s3-event-trigger/dto"
+	"github.com/vsouzx/go-lambda-s3-event-trigger/repository"
+	"github.com/xuri/excelize/v2"
 )
 
-type CsvProcessorService struct {
+type ExcelProcessorService struct {
 	repository *repository.Repository
 }
 
-func NewCsvProcessorService(repository *repository.Repository) *CsvProcessorService {
-	return &CsvProcessorService{
+func NewExcelProcessorService(repository *repository.Repository) *ExcelProcessorService {
+	return &ExcelProcessorService{
 		repository: repository,
 	}
 }
 
-func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
+func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 	tableName := os.Getenv("DYNAMO_TABLE")
 	workerCount, _ := strconv.Atoi(os.Getenv("WORKERS"))
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 
-	file, err := os.Open(csvPath)
+	f, err := excelize.OpenReader(bytes.NewReader(excelBytes))
 	if err != nil {
-		return fmt.Errorf("erro abrindo csv: %w", err)
+		return fmt.Errorf("erro ao abrir excel: %w", err)
 	}
-	defer file.Close()
+	defer f.Close()
 
-	reader := csv.NewReader(file)
-	reader.FieldsPerRecord = -1
+	sheet := f.GetSheetList()[0]
+	rows, err := f.Rows(sheet)
+	if err != nil {
+		return fmt.Errorf("erro ao iterar linhas: %w", err)
+	}
+	defer rows.Close()
 
 	// Canal para enviar lotes para workers
 	batchChan := make(chan []dto.Acesso, 5)
@@ -55,32 +59,28 @@ func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 		}(i)
 	}
 
-	// Leitura do CSV e envio para o canal
+	// Leitura do Excel e envio para o canal
 	line := 0
 	batch := make([]dto.Acesso, 0, batchSize)
 
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			fmt.Println("Fim do arquivo CSV")
-			break
-		}
+	for rows.Next() {
+		cols, err := rows.Columns()
 		if err != nil {
-			return fmt.Errorf("erro lendo csv: %w", err)
+			return fmt.Errorf("erro lendo colunas: %w", err)
 		}
 
 		line++
 		if line == 1 {
 			continue
 		}
-		if len(record) < 3 {
+		if len(cols) < 3 {
 			continue
 		}
 
 		batch = append(batch, dto.Acesso{
-			FuncionalChefe:       record[0],
-			FuncionalColaborador: record[1],
-			Departamento:         record[2],
+			FuncionalChefe:       cols[0],
+			FuncionalColaborador: cols[1],
+			Departamento:         cols[2],
 		})
 
 		if len(batch) == batchSize {

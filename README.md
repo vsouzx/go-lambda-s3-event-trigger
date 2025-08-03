@@ -7,3 +7,7 @@
 <p>-O processamento está sendo feito usando a estratégia de bulk insert (em lote) e com alguns workers concorrendo (goroutines e channel)</p>
 <p>-Provisionamento AWS com <b>Terraform</b> (API Gateway, Lambda, RDS, Bucket S3)</p>
 <p>-CI/CD com Github Actions</p>
+
+
+### Benchmarks
+- Arquivo excel com 1 milhão de registros sendo processado em 2 minutos.

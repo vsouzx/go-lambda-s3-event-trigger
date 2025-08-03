@@ -21,8 +21,7 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 
 	repository := repository.NewRepository(configs.NewDynamoClient())
 	s3Service := service.NewS3Service(configs.NewS3Client())
-	excelToCsvService := service.NewExcelToCsvService()
-	csvProcessorService := service.NewCsvProcessorService(repository)
+	excelProcessorService := service.NewExcelProcessorService(repository)
 
 	for _, record := range s3Event.Records {
 		bucketName := record.S3.Bucket.Name
@@ -34,11 +33,7 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 			return err
 		}
 
-		if err := excelToCsvService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv"); err != nil {
-			return fmt.Errorf("erro ao converter excel para csv: %w", err)
-		}
-
-		if err := csvProcessorService.ProcessCSVFile("/tmp/output.csv"); err != nil {
+		if err := excelProcessorService.ProcessExcelFile(fileBytes); err != nil {
 			return fmt.Errorf("erro ao processar registros do excel no dynamo: %w", err)
 		}
 	}
