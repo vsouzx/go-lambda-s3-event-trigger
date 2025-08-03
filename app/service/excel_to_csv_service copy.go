@@ -24,7 +24,7 @@ func (es *ExcelToCsvService) ConvertExcelToCSV(excelBytes []byte, outputPath str
 	defer f.Close()
 
 	sheet := f.GetSheetList()[0]
-	rows, err := f.GetRows(sheet)
+	rows, err := f.Rows(sheet)
 	if err != nil {
 		return fmt.Errorf("erro ao ler linhas excel: %w", err)
 	}
@@ -38,8 +38,13 @@ func (es *ExcelToCsvService) ConvertExcelToCSV(excelBytes []byte, outputPath str
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	for _, row := range rows {
-		if err := writer.Write(row); err != nil {
+	for rows.Next() {
+		cols, err := rows.Columns()
+		if err != nil {
+			return fmt.Errorf("erro lendo colunas: %w", err)
+		}
+
+		if err := writer.Write(cols); err != nil {
 			return fmt.Errorf("erro escrevendo linha csv: %w", err)
 		}
 	}

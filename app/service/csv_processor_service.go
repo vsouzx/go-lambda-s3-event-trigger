@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/vsouzx/go-lambda-s3-event-trigger/repository"
+	"github.com/vsouzx/go-lambda-s3-event-trigger/dto"
 )
 
 type CsvProcessorService struct {
@@ -25,9 +26,7 @@ func NewCsvProcessorService(repository *repository.Repository) *CsvProcessorServ
 func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 	tableName := os.Getenv("DYNAMO_TABLE")
 	workerCount, _ := strconv.Atoi(os.Getenv("WORKERS"))
-	fmt.Println("workerCount:", workerCount)
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
-	fmt.Println("batch size:", batchSize)
 
 	file, err := os.Open(csvPath)
 	if err != nil {
@@ -39,7 +38,7 @@ func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 	reader.FieldsPerRecord = -1
 
 	// Canal para enviar lotes para workers
-	batchChan := make(chan []map[string]string, 100)
+	batchChan := make(chan []dto.Acesso, 100)
 	var wg sync.WaitGroup
 
 	// Workers que vão processar os lotes
@@ -58,11 +57,10 @@ func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 
 	// Leitura do CSV e envio para o canal
 	line := 0
-	var batch []map[string]string
+	batch := make([]dto.Acesso, 0, batchSize)
 
 	for {
 		record, err := reader.Read()
-		fmt.Println("Processando linha:", line)
 		if err == io.EOF {
 			fmt.Println("Fim do arquivo CSV")
 			break
@@ -79,14 +77,14 @@ func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 			continue
 		}
 
-		batch = append(batch, map[string]string{
-			"funcionalChefe":       record[0],
-			"funcionalColaborador": record[1],
-			"departamento":         record[2],
+		batch = append(batch, dto.Acesso{
+			FuncionalChefe:       record[0],
+			FuncionalColaborador: record[1],
+			Departamento:         record[2],
 		})
 
 		if len(batch) == batchSize {
-			b := make([]map[string]string, len(batch))
+			b := make([]dto.Acesso, len(batch))
 			copy(b, batch)
 			batchChan <- b
 			batch = batch[:0]

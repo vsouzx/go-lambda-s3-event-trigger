@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/vsouzx/go-lambda-s3-event-trigger/dto"
 )
 
 type Repository struct {
@@ -21,7 +22,7 @@ func NewRepository(dynamoClient *dynamodb.Client) *Repository {
 	}
 }
 
-func (es *Repository) BatchInsert(ctx context.Context, tableName string, batch []map[string]string, workerId int) error {
+func (es *Repository) BatchInsert(ctx context.Context, tableName string, batch []dto.Acesso, workerId int) error {
 	if len(batch) == 0 {
 		return nil
 	}
@@ -51,14 +52,12 @@ func (es *Repository) BatchInsert(ctx context.Context, tableName string, batch [
 		}
 
 		if len(resp.UnprocessedItems) == 0 {
-			fmt.Printf("[Worker %d] Lote de %d itens inserido com sucesso!\n", workerId, len(batch))
 			return nil
 		}
 
 		// Se ainda restam itens não processados, reenvia apenas eles
 		request = resp.UnprocessedItems
 		retries++
-		fmt.Printf("[Worker %d] Retry %d - Restam %d itens não processados\n", workerId, retries, len(request[tableName]))
 
 		// Backoff exponencial
 		time.Sleep(time.Duration((1<<retries)*100+rand.Intn(300)) * time.Millisecond)
