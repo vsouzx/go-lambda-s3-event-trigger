@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -28,6 +29,9 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 		}
 
 		excelService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv")
+		if err != nil {
+			return fmt.Errorf("erro ao converter excel para csv: %w", err)
+		}
 
 		excelService.ProcessCSVFile("/tmp/output.csv")
 	}
