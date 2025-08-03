@@ -25,7 +25,9 @@ func NewCsvProcessorService(repository *repository.Repository) *CsvProcessorServ
 func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 	tableName := os.Getenv("DYNAMODB_TABLE_NAME")
 	workerCount, _ := strconv.Atoi(os.Getenv("WORKER_COUNT"))
+	fmt.Println("workerCount:", workerCount)
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
+	fmt.Println("batch size:", batchSize)
 
 	file, err := os.Open(csvPath)
 	if err != nil {
@@ -42,6 +44,7 @@ func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 
 	// Workers que vão processar os lotes
 	for i := range workerCount {
+		fmt.Println("Starting worker:", i)
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
