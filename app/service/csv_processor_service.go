@@ -38,7 +38,7 @@ func (es *CsvProcessorService) ProcessCSVFile(csvPath string) error {
 	reader.FieldsPerRecord = -1
 
 	// Canal para enviar lotes para workers
-	batchChan := make(chan []dto.Acesso, 100)
+	batchChan := make(chan []dto.Acesso, 5)
 	var wg sync.WaitGroup
 
 	// Workers que vão processar os lotes
