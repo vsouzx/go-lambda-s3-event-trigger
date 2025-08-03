@@ -29,9 +29,6 @@ func HandleRequest(ctx context.Context, s3Event events.S3Event) error {
 		}
 
 		excelService.ConvertExcelToCSV(fileBytes, "/tmp/output.csv")
-		if err != nil {
-			return fmt.Errorf("erro ao converter excel para csv: %w", err)
-		}
 
 		excelService.ProcessCSVFile("/tmp/output.csv")
 	}

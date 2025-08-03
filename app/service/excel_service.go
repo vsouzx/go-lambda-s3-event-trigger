@@ -6,11 +6,11 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -67,6 +67,41 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 	reader.FieldsPerRecord = -1
 
 	line := 0
+	var batch []map[string]string
+
+	flushBatch := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+
+		// Montar requests
+		writeReq := make([]types.WriteRequest, 0, len(batch))
+		for _, item := range batch {
+			av, err := attributevalue.MarshalMap(item)
+			if err != nil {
+				return fmt.Errorf("erro ao converter item: %w", err)
+			}
+			writeReq = append(writeReq, types.WriteRequest{
+				PutRequest: &types.PutRequest{Item: av},
+			})
+		}
+
+		// Enviar para DynamoDB
+		_, err := es.dynamoClient.BatchWriteItem(context.Background(), &dynamodb.BatchWriteItemInput{
+			RequestItems: map[string][]types.WriteRequest{
+				tableName: writeReq,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("erro no BatchWriteItem: %w", err)
+		}
+
+		fmt.Printf("✅ Inserido lote de %d itens\n", len(batch))
+		batch = batch[:0] // limpa
+		return nil
+	}
+
+	// Leitura do CSV
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -78,39 +113,26 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 		line++
 		if line == 1 {
-			continue // pula cabeçalho
+			continue // cabeçalho
 		}
 		if len(record) < 3 {
 			continue
 		}
 
-		funcionalCp := record[0]
-		funcionalColaborador := record[1]
-		departamento := record[2]
-
-		fmt.Printf("Linha %d: %s | %s | %s\n", line, funcionalCp, funcionalColaborador, departamento)
-
-		item := map[string]string{
-			"funcionalChefe":       funcionalCp,
-			"funcionalColaborador": funcionalColaborador,
-			"departamento":         departamento,
-		}
-
-		av, err := attributevalue.MarshalMap(item)
-		if err != nil {
-			log.Fatalf("Erro ao converter item: %v", err)
-		}
-
-		_, err = es.dynamoClient.PutItem(context.Background(), &dynamodb.PutItemInput{
-			TableName: &tableName,
-			Item:      av,
+		batch = append(batch, map[string]string{
+			"funcionalChefe":       record[0],
+			"funcionalColaborador": record[1],
+			"departamento":         record[2],
 		})
 
-		if err != nil {
-			log.Fatalf("Erro ao inserir item: %v", err)
-		} else {
-			fmt.Println("Item inserido com sucesso no DynamoDB!")
+		// Quando atingir 25, envia
+		if len(batch) == 25 {
+			if err := flushBatch(); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+
+	// Envia o restante
+	return flushBatch()
 }
