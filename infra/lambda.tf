@@ -62,7 +62,8 @@ resource "aws_lambda_function" "lambda" {
   handler          = "bootstrap"
   filename         = "lambda.zip"
   source_code_hash = filebase64sha256("${path.module}/lambda.zip")
-  memory_size      = 256
+  memory_size      = 512
+  timeout          = 60
 
   environment {
     variables = {
