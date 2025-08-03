@@ -73,6 +73,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 	flushBatch := func() error {
 		if len(batch) == 0 {
+			fmt.Println("Nenhum item para inserir")
 			return nil
 		}
 
@@ -98,6 +99,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 			resp, err := es.dynamoClient.BatchWriteItem(context.Background(), &dynamodb.BatchWriteItemInput{
 				RequestItems: request,
 			})
+			fmt.Printf("Enviando lote de %d itens. Total: %d\n", len(batch), line)
 			if err != nil {
 				return fmt.Errorf("erro no BatchWriteItem: %w", err)
 			}
@@ -126,6 +128,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
+			fmt.Println("Fim do arquivo CSV")
 			break
 		}
 		if err != nil {
@@ -134,7 +137,6 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 		line++
 		if line == 1 {
-			line--
 			continue // cabeçalho
 		}
 		if len(record) < 3 {
