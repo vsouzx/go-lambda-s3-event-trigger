@@ -29,6 +29,13 @@ resource "aws_iam_policy" "lambda_logging" {
                 ],
                 "Resource": "*",
                 "Effect": "Allow"
+            },
+            {
+                "Action": [
+                    "dynamodb:PutItem",
+                ],
+                "Resource": "*",
+                "Effect": "Allow"
             }
         ]
     }
