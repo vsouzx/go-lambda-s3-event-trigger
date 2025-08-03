@@ -19,7 +19,7 @@ import (
 
 const (
 	batchSize   = 25 // limite do DynamoDB
-	workerCount = 10 // número de goroutines para processar em paralelo
+	workerCount = 5 // número de goroutines para processar em paralelo
 )
 
 type ExcelService struct {
@@ -160,7 +160,7 @@ func (es *ExcelService) flushBatch(ctx context.Context, tableName string, batch 
 	}
 
 	retries := 0
-	for len(request) > 0 && retries < 25 {
+	for len(request) > 0 && retries < 10 {
 		resp, err := es.dynamoClient.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
 			RequestItems: request,
 		})
