@@ -104,7 +104,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 			// Se não há itens não processados, terminou com sucesso
 			if len(resp.UnprocessedItems) == 0 {
-				fmt.Printf("✅ Inserido lote de %d itens\n. Total: %d", len(batch), line)
+				fmt.Printf("✅ Inserido lote de %d itens. Total: %d\n", len(batch), line)
 				batch = batch[:0]
 				return nil
 			}
@@ -134,6 +134,7 @@ func (es *ExcelService) ProcessCSVFile(csvPath string) error {
 
 		line++
 		if line == 1 {
+			line--
 			continue // cabeçalho
 		}
 		if len(record) < 3 {
