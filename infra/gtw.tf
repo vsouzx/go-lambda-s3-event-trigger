@@ -137,7 +137,6 @@ resource "aws_api_gateway_integration" "presigned_url_s3_integration_post" {
   type                    = "AWS_PROXY"
   integration_http_method = "POST" # Método usado para integracao com lambda
   uri                     = "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:337328321041:function:s3_presigned_url_lambda/invocations"
-  credentials              = aws_iam_role.apigw_s3_role.arn
 }
 
 resource "aws_api_gateway_method_response" "presigned_url_response_200_post" {
