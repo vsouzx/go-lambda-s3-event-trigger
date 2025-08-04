@@ -46,6 +46,9 @@ resource "aws_iam_role_policy" "apigw_s3_policy" {
   })
 }
 
+# =========================
+# ENDPOINT PARA SUBIR ARQUIVOS NO S3
+# =========================
 resource "aws_api_gateway_resource" "excel_gw_api_resource" {
     parent_id       = aws_api_gateway_rest_api.bucket_s3_gtw_api.root_resource_id
     path_part       = "upload"
@@ -110,6 +113,40 @@ resource "aws_api_gateway_integration_response" "excel_integration_response_200_
   ]
 }
 
+# =========================
+# ENDPOINT PARA GERAR URL PRE ASSINADA
+# =========================
+resource "aws_api_gateway_resource" "presigned_url_gw_api_resource" {
+    parent_id       = aws_api_gateway_rest_api.bucket_s3_gtw_api.root_resource_id
+    path_part       = "presigned-url"
+    rest_api_id     = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+}
+
+//GET
+resource "aws_api_gateway_method" "presigned_url_gw_api_method_post" {
+  authorization   = "NONE"
+  http_method     = "GET"
+  resource_id     = aws_api_gateway_resource.presigned_url_gw_api_resource.id
+  rest_api_id     = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+}
+
+resource "aws_api_gateway_integration" "presigned_url_s3_integration_post" {
+  rest_api_id             = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+  resource_id             = aws_api_gateway_resource.presigned_url_gw_api_resource.id
+  http_method             = aws_api_gateway_method.excel_gw_api_method_post.http_method
+  type                    = "AWS_PROXY"
+  integration_http_method = "POST" # Método usado para integracao com lambda
+  uri                     = "arn:aws:lambda:us-east-1:337328321041:function:s3_presigned_url_lambda"
+  credentials             = aws_iam_role.apigw_s3_role.arn
+}
+
+resource "aws_api_gateway_method_response" "presigned_url_response_200_post" {
+  rest_api_id = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
+  resource_id = aws_api_gateway_resource.presigned_url_gw_api_resource.id
+  http_method = aws_api_gateway_method.presigned_url_gw_api_method_post.http_method
+  status_code = "200"
+}
+
 resource "aws_api_gateway_deployment" "api_deployment" {
     rest_api_id = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
 
@@ -123,7 +160,8 @@ resource "aws_api_gateway_deployment" "api_deployment" {
 
     depends_on = [ 
         aws_api_gateway_integration.excel_s3_integration_post,
-        aws_api_gateway_integration_response.excel_integration_response_200_post  
+        aws_api_gateway_integration_response.excel_integration_response_200_post,
+        aws_api_gateway_integration.presigned_url_s3_integration_post
      ]
 }
 
