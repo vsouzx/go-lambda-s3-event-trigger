@@ -133,7 +133,7 @@ resource "aws_api_gateway_method" "presigned_url_gw_api_method_post" {
 resource "aws_api_gateway_integration" "presigned_url_s3_integration_post" {
   rest_api_id             = aws_api_gateway_rest_api.bucket_s3_gtw_api.id
   resource_id             = aws_api_gateway_resource.presigned_url_gw_api_resource.id
-  http_method             = aws_api_gateway_method.excel_gw_api_method_post.http_method
+  http_method             = aws_api_gateway_method.presigned_url_gw_api_method_post.http_method
   type                    = "AWS_PROXY"
   integration_http_method = "POST" # Método usado para integracao com lambda
   uri                     = "arn:aws:lambda:us-east-1:337328321041:function:s3_presigned_url_lambda"
