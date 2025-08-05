@@ -24,30 +24,29 @@ func NewExcelProcessorService(repository *repository.Repository) *ExcelProcessor
 }
 
 func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
-	tableName := os.Getenv("DYNAMO_TABLE")
-	workerCount, _ := strconv.Atoi(os.Getenv("WORKERS"))
-	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
-
-	f, err := excelize.OpenReader(bytes.NewReader(excelBytes))
+	excelRows, err := es.getExcelRows(excelBytes)
 	if err != nil {
-		return fmt.Errorf("erro ao abrir excel: %w", err)
+		return fmt.Errorf("Erro ao obter linhas do excel: %w", err.Error())
 	}
-	defer f.Close()
-
-	sheet := f.GetSheetList()[0]
-	rows, err := f.Rows(sheet)
-	if err != nil {
-		return fmt.Errorf("erro ao iterar linhas: %w", err)
-	}
-	defer rows.Close()
-
-	// Canal para enviar lotes para workers
+	
 	batchChan := make(chan []dto.Acesso, 5)
 	var wg sync.WaitGroup
 
-	// Workers que vão processar os lotes
+	es.createWorkersToReadBatchesFromChanelAndSendToDynamo(batchChan, &wg)
+	es.readExcelAndSendBatchesToChanel(excelRows, batchChan)
+
+	close(batchChan)
+	wg.Wait()
+
+	fmt.Printf("Finalizado processamento do Excel")
+	return nil
+}
+
+func (es *ExcelProcessorService) createWorkersToReadBatchesFromChanelAndSendToDynamo(batchChan <-chan []dto.Acesso, wg *sync.WaitGroup) {
+	tableName := os.Getenv("DYNAMO_TABLE")
+	workerCount, _ := strconv.Atoi(os.Getenv("WORKERS"))
+
 	for i := range workerCount {
-		fmt.Println("Starting worker:", i)
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
@@ -58,10 +57,29 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 			}
 		}(i)
 	}
+}
 
-	// Leitura do Excel e envio para o canal
-	line := 0
+func (es *ExcelProcessorService) getExcelRows(excelBytes []byte) (*excelize.Rows, error) {
+	f, err := excelize.OpenReader(bytes.NewReader(excelBytes))
+	if err != nil {
+		return nil, fmt.Errorf("Erro ao abrir excel: %s", err.Error())
+	}
+	defer f.Close()
+
+	sheet := f.GetSheetList()[0]
+	rows, err := f.Rows(sheet)
+	if err != nil {
+		return nil, fmt.Errorf("Erro ao iterar linhas: %s", err.Error())
+	}
+	defer rows.Close()
+
+	return rows, nil
+}
+
+func (es *ExcelProcessorService) readExcelAndSendBatchesToChanel(rows *excelize.Rows, batchChan chan<- []dto.Acesso) error {
+	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 	batch := make([]dto.Acesso, 0, batchSize)
+	line := 0
 
 	for rows.Next() {
 		cols, err := rows.Columns()
@@ -69,10 +87,11 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 			return fmt.Errorf("erro lendo colunas: %w", err)
 		}
 
-		line++
-		if line == 1 {
+		if line == 0 {
+			line++
 			continue
 		}
+
 		if len(cols) < 3 {
 			continue
 		}
@@ -95,9 +114,5 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 		batchChan <- batch
 	}
 
-	close(batchChan)
-	wg.Wait()
-
-	fmt.Printf("Finalizado processamento do Excel com %d linhas\n", line)
 	return nil
 }

@@ -4,7 +4,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-func NewDynamoClient() *dynamodb.Client {
-	awsConfig := GetAWSConfig()
-	return dynamodb.NewFromConfig(*awsConfig)
+type DynamoConfig struct {
+	DynamoClient *dynamodb.Client
+}
+
+func NewDynamoConfig(dynamoClient *dynamodb.Client) *DynamoConfig {
+	return &DynamoConfig{
+		DynamoClient: dynamoClient,
+	}
 }
