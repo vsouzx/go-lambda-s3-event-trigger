@@ -59,7 +59,6 @@ func (es *ExcelProcessorService) createWorkersToReadBatchesFromChanelAndSendToDy
 			fmt.Println("Worker ", id, " iniciado")
 			defer wg.Done()
 			for batch := range batchChan {
-				fmt.Printf("[Worker %d] Processando lote de tamanho %d\n", id, len(batch))
 				if err := es.repository.BatchInsert(context.Background(), tableName, batch, id); err != nil {
 					fmt.Printf("[Worker %d] Erro ao inserir lote: %v\n", id, err)
 				}
@@ -100,11 +99,9 @@ func (es *ExcelProcessorService) readExcelAndSendBatchesToChanel(rows *excelize.
 		}
 
 		if line == 0 {
-			fmt.Println("continue")
 			line++
 			continue
 		}
-		fmt.Println("passou continue")
 
 		if len(cols) < 3 {
 			continue
