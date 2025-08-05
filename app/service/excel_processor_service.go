@@ -24,11 +24,18 @@ func NewExcelProcessorService(repository *repository.Repository) *ExcelProcessor
 }
 
 func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
-	excelRows, err := es.getExcelRows(excelBytes)
+	file, err := es.getFile(excelBytes)
+    if err != nil {
+        return fmt.Errorf("Erro ao abrir excel: " + err.Error())
+    }
+    defer file.Close()
+    
+    excelRows, err := es.getExcelRows(file)
 	if err != nil {
 		return fmt.Errorf("Erro ao obter linhas do excel: %w", err.Error())
 	}
-	
+    defer excelRows.Close()
+
 	batchChan := make(chan []dto.Acesso, 5)
 	var wg sync.WaitGroup
 
@@ -38,7 +45,7 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 	close(batchChan)
 	wg.Wait()
 
-	fmt.Printf("Finalizado processamento do Excel")
+	fmt.Printf("Finalizado processamento do Excel\n")
 	return nil
 }
 
@@ -49,8 +56,10 @@ func (es *ExcelProcessorService) createWorkersToReadBatchesFromChanelAndSendToDy
 	for i := range workerCount {
 		wg.Add(1)
 		go func(id int) {
+			fmt.Println("Worker ", id, " iniciado")
 			defer wg.Done()
 			for batch := range batchChan {
+				fmt.Printf("[Worker %d] Processando lote de tamanho %d\n", id, len(batch))
 				if err := es.repository.BatchInsert(context.Background(), tableName, batch, id); err != nil {
 					fmt.Printf("[Worker %d] Erro ao inserir lote: %v\n", id, err)
 				}
@@ -59,24 +68,27 @@ func (es *ExcelProcessorService) createWorkersToReadBatchesFromChanelAndSendToDy
 	}
 }
 
-func (es *ExcelProcessorService) getExcelRows(excelBytes []byte) (*excelize.Rows, error) {
+func (es *ExcelProcessorService) getFile(excelBytes []byte) (*excelize.File, error) {
 	f, err := excelize.OpenReader(bytes.NewReader(excelBytes))
 	if err != nil {
 		return nil, fmt.Errorf("Erro ao abrir excel: %s", err.Error())
 	}
-	defer f.Close()
 
-	sheet := f.GetSheetList()[0]
-	rows, err := f.Rows(sheet)
+    return f, nil
+}
+
+func (es *ExcelProcessorService) getExcelRows(file *excelize.File) (*excelize.Rows, error) {
+	sheet := file.GetSheetList()[0]
+	rows, err := file.Rows(sheet)
 	if err != nil {
 		return nil, fmt.Errorf("Erro ao iterar linhas: %s", err.Error())
 	}
-	defer rows.Close()
 
 	return rows, nil
 }
 
 func (es *ExcelProcessorService) readExcelAndSendBatchesToChanel(rows *excelize.Rows, batchChan chan<- []dto.Acesso) error {
+	fmt.Println("Iniciando leitura do Excel e envio de lotes para o canal")
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 	batch := make([]dto.Acesso, 0, batchSize)
 	line := 0
@@ -88,9 +100,11 @@ func (es *ExcelProcessorService) readExcelAndSendBatchesToChanel(rows *excelize.
 		}
 
 		if line == 0 {
+			fmt.Println("continue")
 			line++
 			continue
 		}
+		fmt.Println("passou continue")
 
 		if len(cols) < 3 {
 			continue
