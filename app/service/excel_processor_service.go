@@ -36,7 +36,9 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 	}
     defer excelRows.Close()
 
-	batchChan := make(chan []dto.Acesso, 5)
+	bufferSize, _ := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
+	
+	batchChan := make(chan []dto.Acesso, bufferSize)
 	var wg sync.WaitGroup
 
 	es.createWorkersToReadBatchesFromChanelAndSendToDynamo(batchChan, &wg)

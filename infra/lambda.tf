@@ -70,6 +70,7 @@ resource "aws_lambda_function" "lambda" {
       DYNAMO_TABLE = var.dynamo_table
       WORKERS = var.workers
       BATCH_SIZE = var.batch_size
+      BUFFER_SIZE = var.buffer_size
     }
   }
 }

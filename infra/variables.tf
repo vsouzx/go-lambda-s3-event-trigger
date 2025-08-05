@@ -27,3 +27,8 @@ variable "batch_size" {
   type = number
   default = 25
 }
+
+variable "buffer_size" {
+  type = number
+  default = 25
+}
