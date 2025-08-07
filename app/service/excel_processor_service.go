@@ -39,6 +39,7 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 
 	reader := csv.NewReader(bytes.NewReader(excelBytes))
 	reader.FieldsPerRecord = -1
+	reader.Comma = ';'
 
 	bufferSize, _ := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
 
@@ -112,6 +113,7 @@ func (es *ExcelProcessorService) readExcelAndSendBatchesToChanel(reader *csv.Rea
 		}
 
 		if len(cols) < 3 {
+			fmt.Println()
 			continue
 		}
 
