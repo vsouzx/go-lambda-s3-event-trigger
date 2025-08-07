@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/csv"
@@ -25,20 +26,9 @@ func NewExcelProcessorService(repository *repository.Repository) *ExcelProcessor
 }
 
 func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
-	// file, err := es.getFile(excelBytes)
-	// if err != nil {
-	//     return fmt.Errorf("Erro ao abrir excel: " + err.Error())
-	// }
-	// defer file.Close()
-
-	// excelRows, err := es.getExcelRows(file)
-	// if err != nil {
-	// 	return fmt.Errorf("Erro ao obter linhas do excel: %w", err.Error())
-	// }
-	// defer excelRows.Close()
-
-	reader := csv.NewReader(bytes.NewReader(excelBytes))
-	reader.FieldsPerRecord = -1
+	buffer := bufio.NewReader(bytes.NewReader(excelBytes))
+	reader := csv.NewReader(buffer)
+	reader.FieldsPerRecord = 3
 	reader.Comma = ';'
 
 	bufferSize, _ := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
@@ -66,7 +56,6 @@ func (es *ExcelProcessorService) createWorkersToReadBatchesFromChanelAndSendToDy
 			fmt.Println("Worker ", id, " iniciado")
 			defer wg.Done()
 			for batch := range batchChan {
-				fmt.Println("batch recebido pelo worker ", id)
 				if err := es.repository.BatchInsert(context.Background(), tableName, batch, id); err != nil {
 					fmt.Printf("[Worker %d] Erro ao inserir lote: %v\n", id, err)
 				}
@@ -75,27 +64,7 @@ func (es *ExcelProcessorService) createWorkersToReadBatchesFromChanelAndSendToDy
 	}
 }
 
-// func (es *ExcelProcessorService) getFile(excelBytes []byte) (*excelize.File, error) {
-// 	f, err := excelize.OpenReader(bytes.NewReader(excelBytes))
-// 	if err != nil {
-// 		return nil, fmt.Errorf("Erro ao abrir excel: %s", err.Error())
-// 	}
-
-//     return f, nil
-// }
-
-// func (es *ExcelProcessorService) getExcelRows(file *excelize.File) (*excelize.Rows, error) {
-// 	sheet := file.GetSheetList()[0]
-// 	rows, err := file.Rows(sheet)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("Erro ao iterar linhas: %s", err.Error())
-// 	}
-
-// 	return rows, nil
-// }
-
 func (es *ExcelProcessorService) readExcelAndSendBatchesToChanel(reader *csv.Reader, batchChan chan<- []dto.Acesso) error {
-	fmt.Println("Iniciando leitura do Excel e envio de lotes para o canal")
 	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
 	batch := make([]dto.Acesso, 0, batchSize)
 	line := 0

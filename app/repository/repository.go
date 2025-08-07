@@ -23,7 +23,6 @@ func NewRepository(dynamoClient *dynamodb.Client) *Repository {
 }
 
 func (es *Repository) BatchInsert(ctx context.Context, tableName string, batch []dto.Acesso, workerId int) error {
-	fmt.Println("Iniciando batch insert")
 	if len(batch) == 0 {
 		return nil
 	}
@@ -45,7 +44,6 @@ func (es *Repository) BatchInsert(ctx context.Context, tableName string, batch [
 
 	retries := 0
 	for len(request) > 0 && retries < 10 {
-		fmt.Println("Realizando batch insert")
 		resp, err := es.dynamoClient.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
 			RequestItems: request,
 		})
