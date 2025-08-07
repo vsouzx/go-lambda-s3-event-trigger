@@ -31,9 +31,9 @@ func (es *ExcelProcessorService) ProcessExcelFile(excelBytes []byte) error {
 	reader.FieldsPerRecord = 3
 	reader.Comma = ';'
 
-	bufferSize, _ := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
+	// bufferSize, _ := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
 
-	batchChan := make(chan []dto.Acesso, bufferSize)
+	batchChan := make(chan []dto.Acesso)
 	var wg sync.WaitGroup
 
 	es.createWorkersToReadBatchesFromChanelAndSendToDynamo(batchChan, &wg)
