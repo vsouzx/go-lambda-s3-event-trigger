@@ -32,7 +32,7 @@ resource "aws_s3_bucket_notification" "excel_bucket_notification" {
     lambda_function_arn = aws_lambda_function.lambda.arn
     events              = ["s3:ObjectCreated:*"] # Dispara em qualquer upload
     filter_prefix       = ""                     # opcional: filtrar por prefixo
-    filter_suffix       = ".xlsx"                # opcional: apenas arquivos Excel
+    filter_suffix       = ".csv"                # opcional: apenas arquivos Excel
   }
 
   depends_on = [aws_lambda_permission.allow_s3_to_invoke_lambda]
