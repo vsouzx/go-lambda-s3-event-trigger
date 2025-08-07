@@ -65,6 +65,7 @@ func (es *ExcelProcessorService) createWorkersToReadBatchesFromChanelAndSendToDy
 			fmt.Println("Worker ", id, " iniciado")
 			defer wg.Done()
 			for batch := range batchChan {
+				fmt.Println("batch recebido pelo worker ", id)
 				if err := es.repository.BatchInsert(context.Background(), tableName, batch, id); err != nil {
 					fmt.Printf("[Worker %d] Erro ao inserir lote: %v\n", id, err)
 				}
