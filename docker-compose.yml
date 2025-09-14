@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"         # Edge port (todos os serviços)
+    environment:
+      - SERVICES=dynamodb   # opcional; sem isso, todos os serviços ficam disponíveis
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      # - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}   # só se você usar a versão Pro
